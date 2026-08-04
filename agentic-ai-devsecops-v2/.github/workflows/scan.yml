@@ -13,7 +13,7 @@ jobs:
         env:
           SCAN_URL: ${{ secrets.SCAN_API_URL }}
         run: |
-          curl -X POST "$SCAN_URL" \
+          curl --fail-with-body --retry 3 -X POST "$SCAN_URL" \
             -H "Content-Type: application/json" \
             -d '{
               "repository": "${{ github.repository }}",
