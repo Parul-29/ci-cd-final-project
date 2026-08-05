@@ -1,3 +1,31 @@
+# name: Trigger Security Scan
+
+# on:
+#   push:
+#     branches: [main]
+#   pull_request:
+
+# # jobs:
+# #   trigger-scan:
+# #     runs-on: ubuntu-latest
+# #     steps:
+# #       - name: Call scan API
+# #         env:
+# #           SCAN_URL: ${{ secrets.SCAN_API_URL }}
+# #         run: |
+# #           curl --fail-with-body --retry 3 -X POST "$SCAN_URL" \
+# #             -H "Content-Type: application/json" \
+# #             -d '{
+# #               "repository": "${{ github.repository }}",
+# #               "branch": "${{ github.ref_name }}",
+# #               "commit_sha": "${{ github.sha }}",
+# #               "changed_files": [],
+# #               "metadata": {
+# #                 "event": "${{ github.event_name }}",
+# #                 "actor": "${{ github.actor }}"
+# #               }
+# #             }'
+
 name: Trigger Security Scan
 
 on:
@@ -8,20 +36,63 @@ on:
 jobs:
   trigger-scan:
     runs-on: ubuntu-latest
+
     steps:
+      - name: Check out repository source
+        uses: actions/checkout@v4
+
+      - name: Build scan request from repository files
+        env:
+          REPOSITORY: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          COMMIT_SHA: ${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          allowed_suffixes = {".py", ".tf", ".tfvars", ".yml", ".yaml", ".txt"}
+          snapshot = {}
+
+          for path in Path(".").rglob("*"):
+              if not path.is_file() or ".git" in path.parts:
+                  continue
+
+              relevant = (
+                  path.suffix.lower() in allowed_suffixes
+                  or path.name.lower() == "codeowners"
+                  or "requirements" in path.name.lower()
+              )
+
+              if relevant and path.stat().st_size <= 100_000:
+                  try:
+                      snapshot[str(path)] = path.read_text(encoding="utf-8")
+                  except UnicodeDecodeError:
+                      pass
+
+          payload = {
+              "repository": os.environ["REPOSITORY"],
+              "branch": os.environ["BRANCH"],
+              "commit_sha": os.environ["COMMIT_SHA"],
+              "changed_files": list(snapshot),
+              "source_snapshot": snapshot,
+              "metadata": {
+                  "event": os.environ["EVENT_NAME"],
+                  "actor": os.environ["ACTOR"]
+              }
+          }
+
+          with open("scan-payload.json", "w", encoding="utf-8") as file:
+              json.dump(payload, file)
+          PY
+
       - name: Call scan API
         env:
           SCAN_URL: ${{ secrets.SCAN_API_URL }}
         run: |
-          curl --fail-with-body --retry 3 -X POST "$SCAN_URL" \
+          curl --fail-with-body --retry 3 -sS -X POST "$SCAN_URL" \
             -H "Content-Type: application/json" \
-            -d '{
-              "repository": "${{ github.repository }}",
-              "branch": "${{ github.ref_name }}",
-              "commit_sha": "${{ github.sha }}",
-              "changed_files": [],
-              "metadata": {
-                "event": "${{ github.event_name }}",
-                "actor": "${{ github.actor }}"
-              }
-            }'
+            --data-binary @scan-payload.json
