@@ -93,6 +93,7 @@ jobs:
         env:
           SCAN_URL: ${{ secrets.SCAN_API_URL }}
         run: |
+          echo "Calling $SCAN_URL"
           curl --fail-with-body --retry 3 -sS -X POST "$SCAN_URL" \
             -H "Content-Type: application/json" \
             --data-binary @scan-payload.json
