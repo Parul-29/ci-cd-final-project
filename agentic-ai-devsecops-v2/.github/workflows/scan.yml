@@ -33,13 +33,22 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   trigger-scan:
     runs-on: ubuntu-latest
 
     steps:
       - name: Check out repository source
-        uses: actions/checkout@v4
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git init
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          git fetch --no-tags --depth=1 origin "${{ github.sha }}"
+          git checkout --detach FETCH_HEAD
 
       - name: Build scan request from repository files
         env:
