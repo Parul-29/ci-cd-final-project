@@ -1,37 +1,10 @@
-# name: Trigger Security Scan
-
-# on:
-#   push:
-#     branches: [main]
-#   pull_request:
-
-# # jobs:
-# #   trigger-scan:
-# #     runs-on: ubuntu-latest
-# #     steps:
-# #       - name: Call scan API
-# #         env:
-# #           SCAN_URL: ${{ secrets.SCAN_API_URL }}
-# #         run: |
-# #           curl --fail-with-body --retry 3 -X POST "$SCAN_URL" \
-# #             -H "Content-Type: application/json" \
-# #             -d '{
-# #               "repository": "${{ github.repository }}",
-# #               "branch": "${{ github.ref_name }}",
-# #               "commit_sha": "${{ github.sha }}",
-# #               "changed_files": [],
-# #               "metadata": {
-# #                 "event": "${{ github.event_name }}",
-# #                 "actor": "${{ github.actor }}"
-# #               }
-# #             }'
-
 name: Trigger Security Scan
 
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -42,13 +15,7 @@ jobs:
 
     steps:
       - name: Check out repository source
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          git init
-          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
-          git fetch --no-tags --depth=1 origin "${{ github.sha }}"
-          git checkout --detach FETCH_HEAD
+        uses: actions/checkout@v4
 
       - name: Build scan request from repository files
         env:
