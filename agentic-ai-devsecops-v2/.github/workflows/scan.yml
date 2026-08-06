@@ -90,10 +90,8 @@ jobs:
           PY
 
       - name: Call scan API
-        env:
-          SCAN_URL: ${{ secrets.SCAN_API_URL }}
         run: |
-          echo "Calling $SCAN_URL"
-          curl --fail-with-body --retry 3 -sS -X POST "$SCAN_URL" \
+          curl --fail-with-body --retry 3 -sS -X POST \
+            "https://agentic-ai-devsecops-v2.vercel.app/api/v1/scans" \
             -H "Content-Type: application/json" \
             --data-binary @scan-payload.json
